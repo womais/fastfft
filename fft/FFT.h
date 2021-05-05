@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <omp.h>
 
+#include <algorithm>
 #include <complex>
 #include <string>
 #include <cmath>
@@ -132,25 +133,36 @@ namespace FFTWrapper {
                     j ^= bit;
                 j ^= bit;
                 if (i < j) {
-                    swap(a[i], a[j]);
+                    std::swap(a[i], a[j]);
                 }
             }
-            for (int len = 2; len <= n; len <<= 1) {
-#pragma omp parallel for num_threads(FFT<T, U, Resultant, CAP>::cores()) schedule(dynamic)
-                for (int i = 0; i < n; i += len) {
-                    for (int j = 0; j < len / 2; ++j) {
+            const int cores = FFT<T, U, Resultant, CAP>::cores();
+            for (int lg = 1, len = 2; len <= n; len <<= 1, ++lg) {
+                const int num_half_intervals = n >> lg;
+                const int blocks_per_half = (cores + num_half_intervals - 1) / num_half_intervals;
+                const int block_size = ((len >> 1) + blocks_per_half - 1) / blocks_per_half;
+                const int num_blocks = blocks_per_half * num_half_intervals;
+#pragma omp parallel for num_threads(cores)
+                for (int blk = 0; blk < num_blocks; ++blk) {
+                    const int which_half = blk / blocks_per_half;
+                    const int block_ind = blk % blocks_per_half;
+                    const int half_start = (which_half << lg);
+                    const int start = half_start + block_ind * block_size;
+                    const int end = std::min(half_start + (len >> 1), start + block_size);
+                    for (int j = 0; j < end - start; ++j) {
                         Complex w;
                         // if we specified precomputation in our template, be sure to use that.
                         if constexpr (CAP > 0) {
-                            int ind = (invert ? len - j : j);
-                            w = RootsOfUnity<U>::roots[31 - __builtin_clz(len)][ind];
+                            int ind = start + j - half_start;
+                            if (invert) ind = len - ind;
+                            w = RootsOfUnity<U>::roots[lg][ind];
                         } else {
                             U ang = 2 * PI * j / len * (invert ? -1 : 1);
                             w = Complex(cos(ang), sin(ang));
                         }
-                        Complex u = a[i + j], v = a[i + j + len / 2] * w;
-                        a[i + j] = u + v;
-                        a[i + j + len / 2] = u - v;
+                        Complex u = a[start + j], v = a[start + j + len / 2] * w;
+                        a[start + j] = u + v;
+                        a[start + j + len / 2] = u - v;
                     }
                 }
             }

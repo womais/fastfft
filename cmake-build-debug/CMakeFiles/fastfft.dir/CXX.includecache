@@ -27,6 +27,8 @@ assert.h
 -
 omp.h
 -
+algorithm
+-
 complex
 -
 string
@@ -56,6 +58,8 @@ thread
 fft/FFT.h
 -
 ConvolutionSlow.h
+-
+numeric
 -
 
 /usr/local/include/omp.h

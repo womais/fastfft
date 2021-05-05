@@ -4,22 +4,22 @@
 #include <thread>
 #include <fft/FFT.h>
 #include <ConvolutionSlow.h>
+#include <numeric>
 
 using std::vector;
 
 void run_convolve_tests(int n, int T) {
     srand(time(0));
+    vector<int> a(n), b(n);
+    std::iota(a.begin(), a.end(), 0);
+    std::iota(b.begin(), b.end(), 0);
     const auto processor_count = std::thread::hardware_concurrency();
-    for (int ncores = 1; ncores <= processor_count; ++ncores) {
-        FFTIterative<int, long double, long long, 1 << 20> fast_fft(ncores);
+    for (int ncores = 1; ncores < processor_count; ++ncores) {
+        FFTIterative<int, long double, long long, 1 << 18> fast_fft(ncores);
+        ConvolutionSlow<int, long long> shit;
         for (int i = 0; i < T; ++i) {
-            vector<int> a(n), b(n);
-            for (int j = 0; j < n; ++j) {
-                a[j] = rand() % (int) 1e6;
-                b[j] = rand() % (int) 1e6;
-            }
-            vector<long long> axb_one, axb_two;
-            std::cout << "Fast Parallel FFT, " << ncores << " core(s): " << fast_fft.timed_convolve(a, b, axb_one) << "\n";
+            vector<long long> axb_two;
+            std::cout << "Fast (" << ncores << "): " << fast_fft.timed_convolve(a, b, axb_two) << "\n";
         }
     }
 }
