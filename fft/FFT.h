@@ -6,13 +6,14 @@
 #define FASTFFT_FFT_H
 
 #include <Convolution.h>
+#include <ConvolutionSlow.h>
 #include <fft/FFTPrecomp.h>
+#include <Complex.h>
 #include <assert.h>
 #include <omp.h>
+#include <immintrin.h>
 
 #include <algorithm>
-#include <complex>
-#include <string>
 
 namespace FFTWrapper {
     using std::vector;
@@ -38,17 +39,23 @@ namespace FFTWrapper {
             size_t n = 1;
             while (n < va.size() + vb.size())
                 n <<= 1;
+            if (n <= 16)
+                return ConvolutionSlow<T, Resultant>().convolve(a, b);
             va.resize(n), vb.resize(n);
             dft(va, false);
             dft(vb, false);
 #pragma omp parallel for num_threads(ncores_)
-            for (int i = 0; i < n; ++i) { 
-                va[i] *= vb[i];
+            for (int i = 0; i < (n >> 2); ++i) {
+                /* Let each thread operate on a separate cache line. */
+                va[i << 2] *= vb[i << 2];
+                va[i << 2 | 1] *= vb[i << 2 | 1];
+                va[i << 2 | 2] *= vb[i << 2 | 2];
+                va[i << 2 | 3] *= vb[i << 2 | 3];
             }
             dft(va, true);
-            vector<Resultant> result(n);
+            vector<Resultant> result(a.size() + b.size() - 1);
 #pragma omp parallel for num_threads(ncores_)
-            for (int i = 0; i < n; ++i) {
+            for (int i = 0; i < result.size(); ++i) {
                 if constexpr (std::is_integral<Resultant>::value) {
                     // TODO: there are almost certainly precision problems here!
                     result[i] = static_cast<Resultant>(std::llround(va[i].real()));
@@ -118,19 +125,27 @@ namespace FFTWrapper {
 
         void dft(vector<Complex> &a, bool invert) const override {
             int n = a.size();
+            /* for AVX-512 loading... */
+            std::array<double, 8> just_n;
+            just_n.fill((double) n);
+
             int lg = 31 - __builtin_clz(n);
             int lg_cap = 31 - __builtin_clz(FFTPrecomp<U>::capacity);
             int shift = lg_cap - lg;
             const int cores = FFT<T, U, Resultant>::cores();
 #pragma omp parallel for num_threads(cores) schedule(dynamic)
-            for (int i = 0; i < n; i++) {
-                if (i < (FFTPrecomp<U>::rev[i] >> shift))  {
-                    std::swap(a[i], a[FFTPrecomp<U>::rev[i] >> shift]);
+            for (int i = 0; i < (n >> 4); i++) {
+                for (int k = 0; k < (1 << 4); ++k) {
+                    if ((i << 4 | k) < (FFTPrecomp<U>::rev[i << 4 | k] >> shift)) {
+                        std::swap(a[i << 4 | k], a[FFTPrecomp<U>::rev[i << 4 | k] >> shift]);
+                    }
                 }
             }
             for (int lg_len = 1, len = 2; len <= n; len <<= 1, lg_len += 1) {
                 const int num_half_intervals = n >> lg_len;
-                const int blocks_per_half = std::min(len >> 1, 2 * (cores + num_half_intervals - 1) / num_half_intervals);
+                int blocks_per_half = std::min(len >> (4 + 1),
+                                               2 * (cores + num_half_intervals - 1) / num_half_intervals);
+                if (blocks_per_half == 0) blocks_per_half = len >> 1;
                 const int block_size = ((len >> 1) + blocks_per_half - 1) / blocks_per_half;
                 const int num_blocks = blocks_per_half * num_half_intervals;
 #pragma omp parallel for num_threads(cores)
@@ -152,8 +167,18 @@ namespace FFTWrapper {
             }
             if (invert) {
 #pragma omp parallel for num_threads(cores)
-                for (int i = 0; i < n; ++i) {
-                    a[i] /= n;
+                for (int i = 0; i < (n >> 2); ++i) {
+                    if constexpr (sizeof(U) == 8) {
+                        __m512d vec = _mm512_load_pd((void *) &a[i << 2]);
+                        __m512d quot = _mm512_load_pd((void *)just_n.data());
+                        __m512d ree =  _mm512_div_pd(vec, quot);
+                        _mm512_store_pd((void *)&a[i << 2], ree);
+                    } else {
+                        a[i << 2] /= n;
+                        a[i << 2 | 1] /= n;
+                        a[i << 2 | 2] /= n;
+                        a[i << 2 | 3] /= n;
+                    }
                 }
             }
         }

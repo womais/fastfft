@@ -12,7 +12,7 @@ class ConvolutionSlow : public Convolution<T, U> {
 public:
     const char *name() const override { return "Slow convolution."; }
     std::vector<U> convolve(const std::vector<T>& a, const std::vector<T>& b) const override {
-        std::vector<U> result(a.size() + b.size());
+        std::vector<U> result(a.size() + b.size() - 1);
         for (int i = 0; i < a.size(); ++i) {
             for (int j = 0; j < b.size(); ++j) {
                 result[i + j] += static_cast<U>(a[i]) * b[j];

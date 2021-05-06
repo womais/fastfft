@@ -6,5 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = -I/Users/wassim.omais/CLionProjects/fastfft/. -I/usr/local/include -I/usr/local/opt/llvm/include
 
-CXX_FLAGS =  -march=native -fopenmp -O3 -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk -std=gnu++17
+CXX_FLAGS =   -fopenmp -mavx512f -O3 -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk -std=gnu++17
 
