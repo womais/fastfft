@@ -35,8 +35,6 @@ complex
 -
 string
 -
-cmath
--
 
 ../fft/FFTPrecomp.h
 Complex.h

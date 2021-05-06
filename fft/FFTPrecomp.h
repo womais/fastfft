@@ -27,7 +27,7 @@ struct FFTPrecomp {
         rev.resize(w);
         roots.resize(w << 1);
         int lg = 31 - __builtin_clz(w);
-#pragma omp parallel for num_threads(cores)
+//#pragma omp parallel for num_threads(cores)
         for (int i = 0; i < w; i++)
             rev[i] = (rev[i >> 1] >> 1) + ((i & 1) << (lg - 1));
         static const U PI = std::acos(static_cast<U>(-1));

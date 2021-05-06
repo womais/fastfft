@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <complex>
 #include <string>
-#include <cmath>
 
 namespace FFTWrapper {
     using std::vector;
@@ -29,7 +28,6 @@ namespace FFTWrapper {
         int ncores_;
     public:
         int cores() const { return ncores_; }
-        static void prepare_to(int w, int cores) { FFTPrecomp<U>::initialize_to(w, cores); }
 
         FFT(int cores) : ncores_(cores) {}
         FFT() : FFT(1) {}
@@ -51,7 +49,7 @@ namespace FFTWrapper {
             vector<Resultant> result(n);
 #pragma omp parallel for num_threads(ncores_)
             for (int i = 0; i < n; ++i) {
-                if constexpr (std::is_arithmetic<Resultant>::value) {
+                if constexpr (std::is_integral<Resultant>::value) {
                     // TODO: there are almost certainly precision problems here!
                     result[i] = static_cast<Resultant>(std::llround(va[i].real()));
                 } else {
@@ -130,8 +128,8 @@ namespace FFTWrapper {
                     std::swap(a[i], a[FFTPrecomp<U>::rev[i] >> shift]);
                 }
             }
-            for (int len = 2; len <= n; len <<= 1) {
-                const int num_half_intervals = n >> lg;
+            for (int lg_len = 1, len = 2; len <= n; len <<= 1, lg_len += 1) {
+                const int num_half_intervals = n >> lg_len;
                 const int blocks_per_half = std::min(len >> 1, 2 * (cores + num_half_intervals - 1) / num_half_intervals);
                 const int block_size = ((len >> 1) + blocks_per_half - 1) / blocks_per_half;
                 const int num_blocks = blocks_per_half * num_half_intervals;
@@ -139,17 +137,16 @@ namespace FFTWrapper {
                 for (int blk = 0; blk < num_blocks; ++blk) {
                     const int which_half = blk / blocks_per_half;
                     const int block_ind = blk % blocks_per_half;
-                    const int half_start = (which_half << lg);
+                    const int half_start = (which_half << lg_len);
                     const int start = half_start + block_ind * block_size;
                     const int end = std::min(half_start + (len >> 1), start + block_size);
                     for (int j = 0; j < end - start; ++j) {
                         int ind = start + j - half_start;
-                        if (invert) ind = len - ind;
-                        ind = ind & (len - 1);
                         Complex w = FFTPrecomp<U>::roots[len + ind];
-                        Complex u = a[start + j], v = a[start + j + len / 2] * w;
+                        w.dat[1] *= 1 - (static_cast<int>(invert) << 1);
+                        Complex u = a[start + j], v = a[start + j + (len >> 1)] * w;
                         a[start + j] = u + v;
-                        a[start + j + len / 2] = u - v;
+                        a[start + j + (len >> 1)] = u - v;
                     }
                 }
             }
