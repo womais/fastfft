@@ -84,6 +84,9 @@
 				</MakeCommands>
 			</Target>
 		</Build>
+		<Unit filename="/Users/wassim.omais/CLionProjects/fastfft/Complex.h">
+			<Option target="fastfft"/>
+		</Unit>
 		<Unit filename="/Users/wassim.omais/CLionProjects/fastfft/Convolution.h">
 			<Option target="fastfft"/>
 		</Unit>
@@ -93,7 +96,7 @@
 		<Unit filename="/Users/wassim.omais/CLionProjects/fastfft/fft/FFT.h">
 			<Option target="fastfft"/>
 		</Unit>
-		<Unit filename="/Users/wassim.omais/CLionProjects/fastfft/fft/RootsOfUnity.h">
+		<Unit filename="/Users/wassim.omais/CLionProjects/fastfft/fft/FFTPrecomp.h">
 			<Option target="fastfft"/>
 		</Unit>
 		<Unit filename="/Users/wassim.omais/CLionProjects/fastfft/main.cpp">

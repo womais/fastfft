@@ -6,6 +6,8 @@
 
 #IncludeRegexTransform: 
 
+../Complex.h
+
 ../Convolution.h
 vector
 -
@@ -21,7 +23,7 @@ Convolution.h
 ../fft/FFT.h
 Convolution.h
 -
-fft/RootsOfUnity.h
+fft/FFTPrecomp.h
 -
 assert.h
 -
@@ -36,12 +38,12 @@ string
 cmath
 -
 
-../fft/RootsOfUnity.h
+../fft/FFTPrecomp.h
+Complex.h
+-
 assert.h
 -
 array
--
-complex
 -
 cmath
 -

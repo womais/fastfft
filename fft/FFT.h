@@ -6,7 +6,7 @@
 #define FASTFFT_FFT_H
 
 #include <Convolution.h>
-#include <fft/RootsOfUnity.h>
+#include <fft/FFTPrecomp.h>
 #include <assert.h>
 #include <omp.h>
 
@@ -18,25 +18,20 @@
 namespace FFTWrapper {
     using std::vector;
 
-    template<typename T, typename U = double, typename Resultant = U, int CAP = 0>
+    template<typename T, typename U = double, typename Resultant = U>
     class FFT : public Convolution<T, Resultant> {
-        static_assert(CAP == 0 || (CAP > 0 && CAP == (CAP & -CAP)), "If specified, capacity must be power of two.");
         static_assert(std::is_floating_point<U>::value, "Computation type must be floating point.");
     private:
-        using Complex = std::complex<U>;
+        using Complex = complex<U>;
 
         virtual void dft(vector<Complex> &a, bool invert) const = 0;
 
         int ncores_;
     public:
         int cores() const { return ncores_; }
+        static void prepare_to(int w, int cores) { FFTPrecomp<U>::initialize_to(w, cores); }
 
-        FFT(int cores) : ncores_(cores) {
-            if constexpr (CAP > 0) {
-                RootsOfUnity<U>::initialize_to(CAP);
-            }
-        }
-
+        FFT(int cores) : ncores_(cores) {}
         FFT() : FFT(1) {}
 
         vector<Resultant> convolve(const vector<T> &a, const vector<T> &b) const override {
@@ -45,7 +40,6 @@ namespace FFTWrapper {
             size_t n = 1;
             while (n < va.size() + vb.size())
                 n <<= 1;
-            assert(CAP == 0 || CAP >= n);
             va.resize(n), vb.resize(n);
             dft(va, false);
             dft(vb, false);
@@ -68,10 +62,10 @@ namespace FFTWrapper {
         }
     }; // FFT<T>
 
-    template<typename T, typename U = double, typename Resultant = U, int CAP = 0>
-    class FFTRecursive : public FFT<T, U, Resultant, CAP> {
+    template<typename T, typename U = double, typename Resultant = U>
+    class FFTRecursive : public FFT<T, U, Resultant> {
     private:
-        using Complex = std::complex<U>;
+        using Complex = complex<U>;
 
         virtual void merge(vector<Complex> &a,
                            vector<Complex> &even,
@@ -112,43 +106,31 @@ namespace FFTWrapper {
         const char *name() const override { return "Sequential Recursive FFT"; }
     }; // FFTRecursive
 
-    template<typename T, typename U = double, typename Resultant = U, int CAP = 0>
-    class FFTIterative : public FFT<T, U, Resultant, CAP> {
+    template<typename T, typename U = double, typename Resultant = U>
+    class FFTIterative : public FFT<T, U, Resultant> {
     public:
         const char *name() const override { return "Iterative In-Place Sequential FFT."; }
 
-        FFTIterative(int cores) : FFT<T, U, Resultant, CAP>(cores) {}
+        FFTIterative(int cores) : FFT<T, U, Resultant>(cores) {}
 
-        FFTIterative() : FFT<T, U, Resultant, CAP>() {}
+        FFTIterative() : FFT<T, U, Resultant>() {}
 
     private:
-        using Complex = std::complex<U>;
+        using Complex = complex<U>;
 
         void dft(vector<Complex> &a, bool invert) const override {
-            U PI;
-            if constexpr (CAP == 0) {
-                PI = acos(static_cast<U>(-1));
-            }
             int n = a.size();
-            auto bitflip = [&](int v) {
-                int lg = 31 - __builtin_clz(n);
-                int res = 0;
-                for (int i = 0; i < lg; ++i) {
-                    if (v & (1 << i)) {
-                        res |= (1 << (lg - i - 1));
-                    }
-                }
-                return res;
-            };
-            const int cores = FFT<T, U, Resultant, CAP>::cores();
-#pragma omp parallel for num_threads(cores)
-            for (int i = 0; i < n; ++i) {
-                const int w = bitflip(i);
-                if (i < w) {
-                    std::swap(a[i], a[w]);
+            int lg = 31 - __builtin_clz(n);
+            int lg_cap = 31 - __builtin_clz(FFTPrecomp<U>::capacity);
+            int shift = lg_cap - lg;
+            const int cores = FFT<T, U, Resultant>::cores();
+#pragma omp parallel for num_threads(cores) schedule(dynamic)
+            for (int i = 0; i < n; i++) {
+                if (i < (FFTPrecomp<U>::rev[i] >> shift))  {
+                    std::swap(a[i], a[FFTPrecomp<U>::rev[i] >> shift]);
                 }
             }
-            for (int lg = 1, len = 2; len <= n; len <<= 1, ++lg) {
+            for (int len = 2; len <= n; len <<= 1) {
                 const int num_half_intervals = n >> lg;
                 const int blocks_per_half = std::min(len >> 1, 2 * (cores + num_half_intervals - 1) / num_half_intervals);
                 const int block_size = ((len >> 1) + blocks_per_half - 1) / blocks_per_half;
@@ -161,16 +143,10 @@ namespace FFTWrapper {
                     const int start = half_start + block_ind * block_size;
                     const int end = std::min(half_start + (len >> 1), start + block_size);
                     for (int j = 0; j < end - start; ++j) {
-                        Complex w;
-                        // if we specified precomputation in our template, be sure to use that.
-                        if constexpr (CAP > 0) {
-                            int ind = start + j - half_start;
-                            if (invert) ind = len - ind;
-                            w = RootsOfUnity<U>::roots[lg][ind];
-                        } else {
-                            U ang = 2 * PI * j / len * (invert ? -1 : 1);
-                            w = Complex(cos(ang), sin(ang));
-                        }
+                        int ind = start + j - half_start;
+                        if (invert) ind = len - ind;
+                        ind = ind & (len - 1);
+                        Complex w = FFTPrecomp<U>::roots[len + ind];
                         Complex u = a[start + j], v = a[start + j + len / 2] * w;
                         a[start + j] = u + v;
                         a[start + j + len / 2] = u - v;
