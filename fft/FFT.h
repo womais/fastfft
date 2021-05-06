@@ -50,7 +50,7 @@ namespace FFTWrapper {
             dft(va, false);
             dft(vb, false);
 #pragma omp parallel for num_threads(ncores_)
-            for (int i = 0; i < n; ++i) {
+            for (int i = 0; i < n; ++i) { 
                 va[i] *= vb[i];
             }
             dft(va, true);
@@ -125,21 +125,32 @@ namespace FFTWrapper {
         using Complex = std::complex<U>;
 
         void dft(vector<Complex> &a, bool invert) const override {
-            const U PI = acos(static_cast<U>(-1));
+            U PI;
+            if constexpr (CAP == 0) {
+                PI = acos(static_cast<U>(-1));
+            }
             int n = a.size();
-            for (int i = 1, j = 0; i < n; ++i) {
-                int bit = n >> 1;
-                for (; j & bit; bit >>= 1)
-                    j ^= bit;
-                j ^= bit;
-                if (i < j) {
-                    std::swap(a[i], a[j]);
+            auto bitflip = [&](int v) {
+                int lg = 31 - __builtin_clz(n);
+                int res = 0;
+                for (int i = 0; i < lg; ++i) {
+                    if (v & (1 << i)) {
+                        res |= (1 << (lg - i - 1));
+                    }
+                }
+                return res;
+            };
+            const int cores = FFT<T, U, Resultant, CAP>::cores();
+#pragma omp parallel for num_threads(cores)
+            for (int i = 0; i < n; ++i) {
+                const int w = bitflip(i);
+                if (i < w) {
+                    std::swap(a[i], a[w]);
                 }
             }
-            const int cores = FFT<T, U, Resultant, CAP>::cores();
             for (int lg = 1, len = 2; len <= n; len <<= 1, ++lg) {
                 const int num_half_intervals = n >> lg;
-                const int blocks_per_half = (cores + num_half_intervals - 1) / num_half_intervals;
+                const int blocks_per_half = std::min(len >> 1, 2 * (cores + num_half_intervals - 1) / num_half_intervals);
                 const int block_size = ((len >> 1) + blocks_per_half - 1) / blocks_per_half;
                 const int num_blocks = blocks_per_half * num_half_intervals;
 #pragma omp parallel for num_threads(cores)
@@ -167,8 +178,9 @@ namespace FFTWrapper {
                 }
             }
             if (invert) {
-                for (Complex &x : a) {
-                    x /= n;
+#pragma omp parallel for num_threads(cores)
+                for (int i = 0; i < n; ++i) {
+                    a[i] /= n;
                 }
             }
         }

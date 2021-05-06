@@ -15,7 +15,7 @@ void run_convolve_tests(int n, int T) {
     std::iota(b.begin(), b.end(), 0);
     const auto processor_count = std::thread::hardware_concurrency();
     for (int ncores = 1; ncores < processor_count; ++ncores) {
-        FFTIterative<int, long double, long long, 1 << 18> fast_fft(ncores);
+        FFTIterative<int, long double, long long, 1 << 21> fast_fft(ncores);
         ConvolutionSlow<int, long long> shit;
         for (int i = 0; i < T; ++i) {
             vector<long long> axb_two;
@@ -28,6 +28,6 @@ int main() {
     std::cout << "How many tests to run?\n";
     int T;
     std::cin >> T;
-    run_convolve_tests(100'000, T);
+    run_convolve_tests(1'000'000, T);
     return 0;
 }
