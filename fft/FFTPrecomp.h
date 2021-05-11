@@ -6,6 +6,7 @@
 #define FASTFFT_FFTPRECOMP_H
 
 #include <Complex.h>
+#include <aligned_allocator.h>
 #include <assert.h>
 #include <array>
 #include <cmath>
@@ -16,7 +17,8 @@
 template<typename U>
 struct FFTPrecomp {
     using Complex = complex<U>;
-    static std::vector<Complex> roots;
+    using vec_cmplx = std::vector<Complex, aligned_allocator<Complex, 512> >;
+    static vec_cmplx roots;
     static std::vector<int> rev;
     static int capacity;
     static void initialize_to(int w, int cores = 1) {
@@ -46,7 +48,7 @@ template <typename U>
 int FFTPrecomp<U>::capacity = 0;
 
 template <typename U>
-std::vector<complex<U>> FFTPrecomp<U>::roots;
+typename FFTPrecomp<U>::vec_cmplx FFTPrecomp<U>::roots;
 
 template <typename U>
 std::vector<int> FFTPrecomp<U>::rev;

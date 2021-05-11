@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <chrono>
+#include <aligned_allocator.h>
 
 namespace ConvolutionWrapper {
     using std::vector;

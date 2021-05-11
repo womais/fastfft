@@ -16,15 +16,11 @@ void run_convolve_tests(int n, int T) {
         b[i] = rand() % (int) 1000;
     }
     const auto processor_count = std::thread::hardware_concurrency();
-    FFTPrecomp<double>::initialize_to(1<<25, 1);
+    FFTPrecomp<double>::initialize_to(1 << 25, 1);
     for (int ncores = 1; ncores <= processor_count - 1; ++ncores) {
         FFTIterative<int, double, long long> fast_fft(ncores);
-        //ConvolutionSlow<int, long long> slow_conv;
-        for (int i = 0; i < T; ++i) {
-            vector<long long> axb_two;
-            vector<long long> axb_one;
-            std::cout << "Fast (" << ncores << "): " << fast_fft.timed_convolve(a, b, axb_two) << "\n";
-        }
+        vector<long long> out;
+        std::cout << "Time (" << ncores << "): " << fast_fft.timed_convolve(a, b, out) << "\n";
     }
 }
 

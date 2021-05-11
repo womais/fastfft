@@ -12,19 +12,22 @@
 #include <assert.h>
 #include <omp.h>
 #include <immintrin.h>
+#include <avx_cmplx.h>
 
 #include <algorithm>
 
 namespace FFTWrapper {
     using std::vector;
-
+    // Currently, only U = double is supported... 
     template<typename T, typename U = double, typename Resultant = U>
     class FFT : public Convolution<T, Resultant> {
         static_assert(std::is_floating_point<U>::value, "Computation type must be floating point.");
     private:
         using Complex = complex<U>;
-
-        virtual void dft(vector<Complex> &a, bool invert) const = 0;
+        using vec_cmplx = vector<Complex, aligned_allocator<Complex, 64>>;
+        
+        virtual void dft(vec_cmplx& a) const = 0;
+        virtual void dft_inverse(vec_cmplx& a) const = 0;
 
         int ncores_;
     public:
@@ -34,16 +37,16 @@ namespace FFTWrapper {
         FFT() : FFT(1) {}
 
         vector<Resultant> convolve(const vector<T> &a, const vector<T> &b) const override {
-            vector<Complex> va(a.begin(), a.end());
-            vector<Complex> vb(b.begin(), b.end());
+            vec_cmplx va(a.begin(), a.end());
+            vec_cmplx vb(b.begin(), b.end());
             size_t n = 1;
             while (n < va.size() + vb.size())
                 n <<= 1;
             if (n <= 16)
                 return ConvolutionSlow<T, Resultant>().convolve(a, b);
             va.resize(n), vb.resize(n);
-            dft(va, false);
-            dft(vb, false);
+            dft(va);
+            dft(vb);
 #pragma omp parallel for num_threads(ncores_)
             for (int i = 0; i < (n >> 2); ++i) {
                 /* Let each thread operate on a separate cache line. */
@@ -52,7 +55,7 @@ namespace FFTWrapper {
                 va[i << 2 | 2] *= vb[i << 2 | 2];
                 va[i << 2 | 3] *= vb[i << 2 | 3];
             }
-            dft(va, true);
+            dft_inverse(va);
             vector<Resultant> result(a.size() + b.size() - 1);
 #pragma omp parallel for num_threads(ncores_)
             for (int i = 0; i < result.size(); ++i) {
@@ -71,10 +74,11 @@ namespace FFTWrapper {
     class FFTRecursive : public FFT<T, U, Resultant> {
     private:
         using Complex = complex<U>;
+        using vec_cmplx = vector<Complex, aligned_allocator<Complex, 64> >;
 
-        virtual void merge(vector<Complex> &a,
-                           vector<Complex> &even,
-                           vector<Complex> &odd,
+        virtual void merge(vec_cmplx &a,
+                           vec_cmplx &even,
+                           vec_cmplx &odd,
                            bool invert) const {
             const U PI = std::acos(static_cast<U>(-1.0));
             const int n = a.size();
@@ -90,22 +94,25 @@ namespace FFTWrapper {
                 w *= root_of_unity;
             }
         }
-
-        void dft(vector<Complex> &a, bool invert) const override {
+        template <bool invert>
+        void dft_(vec_cmplx &a) const {
             const int n = a.size();
             if (n == 1)
                 return;
             // n must be power of two!
             assert(n == (n & -n));
-            vector<Complex> even(n / 2), odd(n / 2);
+            vec_cmplx even(n / 2), odd(n / 2);
             for (int i = 0; 2 * i < n; ++i) {
                 even[i] = a[2 * i];
                 odd[i] = a[2 * i + 1];
             }
-            dft(even, invert);
-            dft(odd, invert);
+            dft_<invert>(even);
+            dft_<invert>(odd);
             merge(a, even, odd, invert);
         }
+
+        void dft(vec_cmplx& a) const override { dft_<false>(a); } 
+        void dft_inverse(vec_cmplx& a) const override { dft_<true>(a); }
 
     public:
         const char *name() const override { return "Sequential Recursive FFT"; }
@@ -122,13 +129,10 @@ namespace FFTWrapper {
 
     private:
         using Complex = complex<U>;
-
-        void dft(vector<Complex> &a, bool invert) const override {
+        using vec_cmplx = vector<Complex, aligned_allocator<Complex, 64> >;
+        template <bool invert>
+        void dft_(vec_cmplx &a) const {
             int n = a.size();
-            /* for AVX-512 loading... */
-            std::array<double, 8> just_n;
-            just_n.fill((double) n);
-
             int lg = 31 - __builtin_clz(n);
             int lg_cap = 31 - __builtin_clz(FFTPrecomp<U>::capacity);
             int shift = lg_cap - lg;
@@ -141,47 +145,52 @@ namespace FFTWrapper {
                     }
                 }
             }
-            for (int lg_len = 1, len = 2; len <= n; len <<= 1, lg_len += 1) {
+            const Complex _w2 = [&]() { 
+                if (invert) return Complex(FFTPrecomp<U>::roots[2].dat[0], -FFTPrecomp<U>::roots[2].dat[1]);
+                else return FFTPrecomp<U>::roots[2];
+            }();
+#pragma omp parallel for num_threads(cores)
+            for (int i = 0; i < n; i += 2) {
+                Complex u = a[i], v = a[i + 1] * _w2;
+                a[i] = u + v;
+                a[i + 1] = u - v;
+            }
+            for (int lg_len = 2, len = 4; len <= n; len <<= 1, lg_len += 1) {
                 const int num_half_intervals = n >> lg_len;
-                int blocks_per_half = std::min(len >> (4 + 1),
-                                               2 * (cores + num_half_intervals - 1) / num_half_intervals);
-                if (blocks_per_half == 0) blocks_per_half = len >> 1;
-                const int block_size = ((len >> 1) + blocks_per_half - 1) / blocks_per_half;
+                const int blocks_per_half = (len >> 2); 
                 const int num_blocks = blocks_per_half * num_half_intervals;
 #pragma omp parallel for num_threads(cores)
                 for (int blk = 0; blk < num_blocks; ++blk) {
                     const int which_half = blk / blocks_per_half;
                     const int block_ind = blk % blocks_per_half;
                     const int half_start = (which_half << lg_len);
-                    const int start = half_start + block_ind * block_size;
-                    const int end = std::min(half_start + (len >> 1), start + block_size);
-                    for (int j = 0; j < end - start; ++j) {
-                        int ind = start + j - half_start;
-                        Complex w = FFTPrecomp<U>::roots[len + ind];
-                        w.dat[1] *= 1 - (static_cast<int>(invert) << 1);
-                        Complex u = a[start + j], v = a[start + j + (len >> 1)] * w;
-                        a[start + j] = u + v;
-                        a[start + j + (len >> 1)] = u - v;
+                    const int start = half_start + block_ind * 2;
+                    __m256d vecw = _mm256_load_pd(reinterpret_cast<double*>(&FFTPrecomp<U>::roots[len + start - half_start]));
+                    __m256d vecu = _mm256_load_pd(reinterpret_cast<double*>(&a[start]));
+                    __m256d vecv = _mm256_load_pd(reinterpret_cast<double*>(&a[start + (len >> 1)]));
+                    if constexpr (invert) {
+                        __m256d scale = _mm256_setr_pd(1.0, -1.0, 1.0, -1.0);
+                        vecw = _mm256_mul_pd(vecw, scale);
                     }
+                    vecv = avx_cmplx_mul(vecv, vecw);
+                    _mm256_store_pd(reinterpret_cast<double*>(&a[start]), _mm256_add_pd(vecu, vecv));
+                    _mm256_store_pd(reinterpret_cast<double*>(&a[start + (len >> 1)]), _mm256_sub_pd(vecu, vecv));
                 }
             }
-            if (invert) {
+            if constexpr (invert) {
 #pragma omp parallel for num_threads(cores)
                 for (int i = 0; i < (n >> 2); ++i) {
-                    if constexpr (sizeof(U) == 8) {
-                        __m512d vec = _mm512_load_pd((void *) &a[i << 2]);
-                        __m512d quot = _mm512_load_pd((void *)just_n.data());
-                        __m512d ree =  _mm512_div_pd(vec, quot);
-                        _mm512_store_pd((void *)&a[i << 2], ree);
-                    } else {
-                        a[i << 2] /= n;
-                        a[i << 2 | 1] /= n;
-                        a[i << 2 | 2] /= n;
-                        a[i << 2 | 3] /= n;
-                    }
+                    a[i << 2] /= n;
+                    a[i << 2 | 1] /= n;
+                    a[i << 2 | 2] /= n;
+                    a[i << 2 | 3] /= n;
                 }
             }
         }
+        
+        void dft(vec_cmplx& a) const override { dft_<false>(a); } 
+        void dft_inverse(vec_cmplx& a) const override { dft_<true>(a); }
+
     }; // FFTIterative
 } // namespace FFTWrapper
 
