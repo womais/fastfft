@@ -4,6 +4,8 @@
 CMakeFiles/fastfft.dir/main.cpp.o: ../Complex.h
 CMakeFiles/fastfft.dir/main.cpp.o: ../Convolution.h
 CMakeFiles/fastfft.dir/main.cpp.o: ../ConvolutionSlow.h
+CMakeFiles/fastfft.dir/main.cpp.o: ../aligned_allocator.h
+CMakeFiles/fastfft.dir/main.cpp.o: ../avx_cmplx.h
 CMakeFiles/fastfft.dir/main.cpp.o: ../fft/FFT.h
 CMakeFiles/fastfft.dir/main.cpp.o: ../fft/FFTPrecomp.h
 CMakeFiles/fastfft.dir/main.cpp.o: ../main.cpp

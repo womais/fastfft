@@ -15,9 +15,19 @@ string
 -
 chrono
 -
+aligned_allocator.h
+-
 
 ../ConvolutionSlow.h
 Convolution.h
+-
+
+../aligned_allocator.h
+mm_malloc.h
+-
+
+../avx_cmplx.h
+immintrin.h
 -
 
 ../fft/FFT.h
@@ -35,11 +45,15 @@ omp.h
 -
 immintrin.h
 -
+avx_cmplx.h
+-
 algorithm
 -
 
 ../fft/FFTPrecomp.h
 Complex.h
+-
+aligned_allocator.h
 -
 assert.h
 -

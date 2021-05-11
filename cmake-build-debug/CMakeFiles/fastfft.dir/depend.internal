@@ -5,6 +5,8 @@ CMakeFiles/fastfft.dir/main.cpp.o
  ../Complex.h
  ../Convolution.h
  ../ConvolutionSlow.h
+ ../aligned_allocator.h
+ ../avx_cmplx.h
  ../fft/FFT.h
  ../fft/FFTPrecomp.h
  /Users/wassim.omais/CLionProjects/fastfft/main.cpp
