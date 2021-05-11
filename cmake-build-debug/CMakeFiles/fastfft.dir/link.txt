@@ -1,1 +1,0 @@
-/usr/local/opt/llvm/bin/clang++   -fopenmp -mavx512f -O3 -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/fastfft.dir/main.cpp.o -o fastfft   -L/usr/local/lib  -L/usr/local/opt/llvm/lib 
