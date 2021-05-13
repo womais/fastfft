@@ -1,7 +1,3 @@
-//
-// Created by Wassim Omais on 5/3/21.
-//
-
 #ifndef FASTFFT_FFT_H
 #define FASTFFT_FFT_H
 
@@ -19,16 +15,21 @@
 namespace FFTWrapper {
     using std::vector;
     // Currently, only U = double is supported... 
-    template<typename T, typename U = double, typename Resultant = U>
-    class FFT : public Convolution<T, Resultant> {
+    template<typename U = double>
+    class FFT : public Convolution<complex<U>> {
         static_assert(std::is_floating_point<U>::value, "Computation type must be floating point.");
+    public:
+        using vec_cmplx = vector<complex<U>, aligned_allocator<complex<U>, 64>>;
+        int required_size(int x, int y) const override {
+            int k = 1;
+            while (k < x + y)
+                k <<= 1;
+            return k;
+        }
     private:
         using Complex = complex<U>;
-        using vec_cmplx = vector<Complex, aligned_allocator<Complex, 64>>;
-        
         virtual void dft(vec_cmplx& a) const = 0;
         virtual void dft_inverse(vec_cmplx& a) const = 0;
-
         int ncores_;
     public:
         int cores() const { return ncores_; }
@@ -36,17 +37,12 @@ namespace FFTWrapper {
         FFT(int cores) : ncores_(cores) {}
         FFT() : FFT(1) {}
 
-        vector<Resultant> convolve(const vector<T> &a, const vector<T> &b) const override {
-            vec_cmplx va(a.begin(), a.end());
-            vec_cmplx vb(b.begin(), b.end());
-            size_t n = 1;
-            while (n < va.size() + vb.size())
-                n <<= 1;
-            if (n <= 16)
-                return ConvolutionSlow<T, Resultant>().convolve(a, b);
+        void convolve(vec_cmplx& va, vec_cmplx& vb, int keep) const override {
+            if (keep <= 16)
+                return ConvolutionSlow<Complex>().convolve(va, vb, keep);
+            const int n = va.size();
             va.resize(n), vb.resize(n);
-            dft(va);
-            dft(vb);
+            dft(va); dft(vb);
 #pragma omp parallel for num_threads(ncores_)
             for (int i = 0; i < (n >> 2); ++i) {
                 /* Let each thread operate on a separate cache line. */
@@ -56,22 +52,12 @@ namespace FFTWrapper {
                 va[i << 2 | 3] *= vb[i << 2 | 3];
             }
             dft_inverse(va);
-            vector<Resultant> result(a.size() + b.size() - 1);
-#pragma omp parallel for num_threads(ncores_)
-            for (int i = 0; i < result.size(); ++i) {
-                if constexpr (std::is_integral<Resultant>::value) {
-                    // TODO: there are almost certainly precision problems here!
-                    result[i] = static_cast<Resultant>(std::llround(va[i].real()));
-                } else {
-                    result[i] = va[i].real();
-                }
-            }
-            return result;
+            va.resize(keep);
         }
     }; // FFT<T>
 
-    template<typename T, typename U = double, typename Resultant = U>
-    class FFTRecursive : public FFT<T, U, Resultant> {
+    template<typename U = double>
+    class FFTRecursive : public FFT<U> {
     private:
         using Complex = complex<U>;
         using vec_cmplx = vector<Complex, aligned_allocator<Complex, 64> >;
@@ -115,17 +101,17 @@ namespace FFTWrapper {
         void dft_inverse(vec_cmplx& a) const override { dft_<true>(a); }
 
     public:
-        const char *name() const override { return "Sequential Recursive FFT"; }
+        const char *name() const override { return "Recursive FFT"; }
     }; // FFTRecursive
 
-    template<typename T, typename U = double, typename Resultant = U>
-    class FFTIterative : public FFT<T, U, Resultant> {
+    template<typename U = double>
+    class FFTIterative : public FFT<U> {
     public:
-        const char *name() const override { return "Iterative In-Place Sequential FFT."; }
+        const char *name() const override { return "Iterative In-Place FFT."; }
 
-        FFTIterative(int cores) : FFT<T, U, Resultant>(cores) {}
+        FFTIterative(int cores) : FFT<U>(cores) {}
 
-        FFTIterative() : FFT<T, U, Resultant>() {}
+        FFTIterative() : FFT<U>() {}
 
     private:
         using Complex = complex<U>;
@@ -136,7 +122,7 @@ namespace FFTWrapper {
             int lg = 31 - __builtin_clz(n);
             int lg_cap = 31 - __builtin_clz(FFTPrecomp<U>::capacity);
             int shift = lg_cap - lg;
-            const int cores = FFT<T, U, Resultant>::cores();
+            const int cores = FFT<U>::cores();
 #pragma omp parallel for num_threads(cores) schedule(dynamic)
             for (int i = 0; i < (n >> 4); i++) {
                 for (int k = 0; k < (1 << 4); ++k) {
@@ -177,6 +163,7 @@ namespace FFTWrapper {
                     _mm256_store_pd(reinterpret_cast<double*>(&a[start + (len >> 1)]), _mm256_sub_pd(vecu, vecv));
                 }
             }
+
             if constexpr (invert) {
 #pragma omp parallel for num_threads(cores)
                 for (int i = 0; i < (n >> 2); ++i) {

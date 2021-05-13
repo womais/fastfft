@@ -1,7 +1,3 @@
-//
-// Created by Wassim Omais on 5/4/21.
-//
-
 #ifndef FASTFFT_FFTPRECOMP_H
 #define FASTFFT_FFTPRECOMP_H
 
