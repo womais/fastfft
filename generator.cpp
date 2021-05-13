@@ -36,6 +36,7 @@ int main(int argc, const char* argv[]) {
 
         os << "\n";
     };
+/*
     for (int i = 1; i <= num_tests; ++i)
     {
         std::cout << "Generating test " << i << "..." << "\n";
@@ -52,6 +53,7 @@ int main(int argc, const char* argv[]) {
         dump_vec(os, a, size_a + size_b - 1);
         std::cout << "OK done!\n\n";
     }
+    */
     if (argc == 4 && !strcmp(argv[3], "--include-large")) {
         std::cout << "Preparing for large case generation. Initializing fast FFT...\n";
         FFTPrecomp<double>::initialize_to(1 << 28, 4);

@@ -40,7 +40,7 @@ struct FFTPrecomp {
                 roots[base + k].dat[1] = std::sin(ang);
             }
         }
-        //initialize_gpu_data(roots.size(), roots.data());
+        initialize_gpu_precomp(roots.size(), roots.data());
     }
 };
 template <typename U>

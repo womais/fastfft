@@ -170,10 +170,10 @@ namespace FFTWrapper {
                 a[i] = u + v;
                 a[i + 1] = u - v;
             }
-            //initialize_gpu_data(n, a.data());
-            for (int lg_len = 2, len = 4; len <= n; len <<= 1, lg_len += 1) {
-                do_pass_cpu<invert>(a, len, lg_len, n);
-            }
+            initialize_gpu_data(n, a.data());
+            for (int lg_len = 2, len = 4; len <= n; len <<= 1, lg_len += 1)
+                do_pass_gpu<invert>(len, lg_len, n);
+            finish_gpu_data(n);
             if constexpr (invert) {
 #pragma omp parallel for num_threads(cores)
                 for (int i = 0; i < (n >> 2); ++i) {

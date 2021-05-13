@@ -1,17 +1,21 @@
+#include <stdio.h>
+
 struct Complex {
     double real;
     double imag;
 };
-Complex* a_device = nullptr;
-Complex* host_mem = nullptr;
-Complex* device_precomp = nullptr;
+Complex* a_device = NULL;
+Complex* host_mem = NULL;
+Complex* device_precomp = NULL;
 
 __global__
 void donkey_inv(Complex* precomp,
                 Complex* a, 
                 int blocks_per_half, 
-                int lg_len) {
+                int lg_len,
+                int num_blocks) {
     const int blk = blockIdx.x * blockDim.x + threadIdx.x;
+    if (blk > num_blocks) return;
     const int len = 1 << lg_len;
 
     // more...
@@ -39,8 +43,10 @@ __global__
 void donkey(Complex* precomp,
                 Complex* a, 
                 int blocks_per_half, 
-                int lg_len) {
+                int lg_len,
+                int num_blocks) {
     const int blk = blockIdx.x * blockDim.x + threadIdx.x;
+    if (blk > num_blocks) return;
     const int len = 1 << lg_len;
 
     // more...
@@ -66,13 +72,15 @@ void donkey(Complex* precomp,
 // costly, but should only do it once...
 // this copies over precomputed roots of unity
 // to global memory.
+extern "C"
+{
 void initialize_gpu_precomp(size_t N, void* data) {
     cudaMalloc(&device_precomp, N * sizeof(Complex));
     cudaMemcpy(device_precomp, data, N * sizeof(Complex), cudaMemcpyHostToDevice);
 }
 
 void initialize_gpu_data(size_t N, void* values) {
-    if (a_device == nullptr)
+    if (a_device == NULL)
         cudaMalloc(&a_device, N * sizeof(Complex));
     host_mem = (Complex*)values;
     cudaMemcpy(a_device, host_mem, N * sizeof(Complex), cudaMemcpyHostToDevice);
@@ -81,18 +89,23 @@ void initialize_gpu_data(size_t N, void* values) {
 void finish_gpu_data(size_t N) {
     cudaMemcpy(host_mem, a_device, N * sizeof(Complex), cudaMemcpyDeviceToHost);
     cudaFree(a_device);
+    a_device = NULL;
 }
-
 void run_gpu_pass(int len, int lg_len, int n) {
     const int num_half_intervals = n >> lg_len;
     const int blocks_per_half = (len >> 2);
     const int num_blocks = blocks_per_half * num_half_intervals; 
-    donkey<<<(num_blocks + 255) / 256, 256>>>(device_precomp, a_device, blocks_per_half, lg_len);
+    donkey<<<(num_blocks + 255) / 512, 512>>>(device_precomp, a_device, blocks_per_half, lg_len, num_blocks);
+    cudaDeviceSynchronize();
+
 }
 void run_gpu_pass_inv(int len, int lg_len, int n) {
     const int num_half_intervals = n >> lg_len;
     const int blocks_per_half = (len >> 2);
     const int num_blocks = blocks_per_half * num_half_intervals; 
-    donkey_inv<<<(num_blocks + 255) / 256, 256>>>(device_precomp, a_device, blocks_per_half, lg_len);
+    donkey_inv<<<(num_blocks + 255) / 512, 512>>>(device_precomp, a_device, blocks_per_half, lg_len, num_blocks);
+    cudaDeviceSynchronize();
+
 }
 
+}

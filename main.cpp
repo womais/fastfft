@@ -7,6 +7,7 @@
 #include <filesystem>
 
 namespace fs = std::filesystem;
+
 using std::vector;
 using fftvec = FFT<double>::vec_cmplx; // aligned vector type.
 
