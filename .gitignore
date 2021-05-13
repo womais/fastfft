@@ -1,3 +1,5 @@
 cmake-build-debug/
 .idea/
 tests/random-large*
+generator
+fastfft

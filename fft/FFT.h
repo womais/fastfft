@@ -9,8 +9,8 @@
 #include <omp.h>
 #include <immintrin.h>
 #include <avx_cmplx.h>
-
 #include <algorithm>
+#include <fft/gpu_tools.h>
 
 namespace FFTWrapper {
     using std::vector;
@@ -117,6 +117,35 @@ namespace FFTWrapper {
         using Complex = complex<U>;
         using vec_cmplx = vector<Complex, aligned_allocator<Complex, 64> >;
         template <bool invert>
+        void do_pass_cpu(vec_cmplx& a, int len, int lg_len, int n) const {
+            const int cores = FFT<U>::cores();
+            const int num_half_intervals = n >> lg_len;
+            const int blocks_per_half = (len >> 2); 
+            const int num_blocks = blocks_per_half * num_half_intervals;
+#pragma omp parallel for num_threads(cores)
+            for (int blk = 0; blk < num_blocks; ++blk) {
+                const int which_half = blk / blocks_per_half;
+                const int block_ind = blk % blocks_per_half;
+                const int half_start = (which_half << lg_len);
+                const int start = half_start + block_ind * 2;
+                 __m256d vecw = _mm256_load_pd(reinterpret_cast<double*>(&FFTPrecomp<U>::roots[len + start - half_start]));
+                __m256d vecu = _mm256_load_pd(reinterpret_cast<double*>(&a[start]));
+                __m256d vecv = _mm256_load_pd(reinterpret_cast<double*>(&a[start + (len >> 1)]));
+                if constexpr (invert) {
+                    __m256d scale = _mm256_setr_pd(1.0, -1.0, 1.0, -1.0);
+                    vecw = _mm256_mul_pd(vecw, scale);
+                }
+                vecv = avx_cmplx_mul(vecv, vecw);
+                _mm256_store_pd(reinterpret_cast<double*>(&a[start]), _mm256_add_pd(vecu, vecv));
+                _mm256_store_pd(reinterpret_cast<double*>(&a[start + (len >> 1)]), _mm256_sub_pd(vecu, vecv));
+            }
+        }
+        template <bool invert>
+        void do_pass_gpu(int len, int lg_len, int n) const {
+            if constexpr (invert) run_gpu_pass_inv(len, lg_len, n);
+            else run_gpu_pass(len, lg_len, n);
+        }
+        template <bool invert>
         void dft_(vec_cmplx &a) const {
             int n = a.size();
             int lg = 31 - __builtin_clz(n);
@@ -141,29 +170,10 @@ namespace FFTWrapper {
                 a[i] = u + v;
                 a[i + 1] = u - v;
             }
+            //initialize_gpu_data(n, a.data());
             for (int lg_len = 2, len = 4; len <= n; len <<= 1, lg_len += 1) {
-                const int num_half_intervals = n >> lg_len;
-                const int blocks_per_half = (len >> 2); 
-                const int num_blocks = blocks_per_half * num_half_intervals;
-#pragma omp parallel for num_threads(cores)
-                for (int blk = 0; blk < num_blocks; ++blk) {
-                    const int which_half = blk / blocks_per_half;
-                    const int block_ind = blk % blocks_per_half;
-                    const int half_start = (which_half << lg_len);
-                    const int start = half_start + block_ind * 2;
-                    __m256d vecw = _mm256_load_pd(reinterpret_cast<double*>(&FFTPrecomp<U>::roots[len + start - half_start]));
-                    __m256d vecu = _mm256_load_pd(reinterpret_cast<double*>(&a[start]));
-                    __m256d vecv = _mm256_load_pd(reinterpret_cast<double*>(&a[start + (len >> 1)]));
-                    if constexpr (invert) {
-                        __m256d scale = _mm256_setr_pd(1.0, -1.0, 1.0, -1.0);
-                        vecw = _mm256_mul_pd(vecw, scale);
-                    }
-                    vecv = avx_cmplx_mul(vecv, vecw);
-                    _mm256_store_pd(reinterpret_cast<double*>(&a[start]), _mm256_add_pd(vecu, vecv));
-                    _mm256_store_pd(reinterpret_cast<double*>(&a[start + (len >> 1)]), _mm256_sub_pd(vecu, vecv));
-                }
+                do_pass_cpu<invert>(a, len, lg_len, n);
             }
-
             if constexpr (invert) {
 #pragma omp parallel for num_threads(cores)
                 for (int i = 0; i < (n >> 2); ++i) {

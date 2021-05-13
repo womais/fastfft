@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <cstring>
 #include <ConvolutionSlow.h>
 #include <fft/FFT.h>
 #include <random>
@@ -53,9 +54,9 @@ int main(int argc, const char* argv[]) {
     }
     if (argc == 4 && !strcmp(argv[3], "--include-large")) {
         std::cout << "Preparing for large case generation. Initializing fast FFT...\n";
-        FFTPrecomp<double>::initialize_to(1 << 27, 2);
+        FFTPrecomp<double>::initialize_to(1 << 28, 4);
         int size = 1 << 20;
-        for (int i = num_tests + 1; i <= num_tests + 5; ++i) {
+        for (int i = num_tests + 1; i <= num_tests + 7; ++i) {
             std::cout << "Generating large test " << i - num_tests << " ..." << "\n";
             std::ofstream os(path + "/random-large" + std::to_string(i - num_tests) + ".ffttest");
             const int k = conv_fast.required_size(size, size);

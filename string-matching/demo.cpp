@@ -56,7 +56,7 @@ vector<int> fft_matcher(const string& pattern,
      *
      * A convolution of m + 0 i denotes a match. Anything else is a mismatch.
      */
-    FFTIterative convolver;
+    FFTIterative convolver(cores);
     const int n = pattern.size(), m = target.size();
     int wildcards = std::count(target.begin(), target.end(), '*');
     const int need = convolver.required_size(n, m);

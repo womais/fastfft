@@ -6,6 +6,8 @@
 #include <assert.h>
 #include <array>
 #include <cmath>
+#include <vector>
+#include <fft/gpu_tools.h>
 
 // Precomputation of exp(2 * i * k * pi / SIZE).
 // Ideally could do some stuff at compile time upon request,
@@ -38,6 +40,7 @@ struct FFTPrecomp {
                 roots[base + k].dat[1] = std::sin(ang);
             }
         }
+        //initialize_gpu_data(roots.size(), roots.data());
     }
 };
 template <typename U>
