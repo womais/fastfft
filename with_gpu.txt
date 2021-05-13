@@ -1,0 +1,173 @@
+Initializing FFT...
+FFT Initialized!
+
+Starting large random cases with 1 cores.
+
+Starting tests using following implementation: 
+Iterative In-Place FFT.
+************************
+Doing test random-large1.ffttest...
+OK, correct result! Time taken was 205.197 ms.
+
+Doing test random-large2.ffttest...
+OK, correct result! Time taken was 507.516 ms.
+
+Doing test random-large3.ffttest...
+OK, correct result! Time taken was 1078.47 ms.
+
+Doing test random-large4.ffttest...
+OK, correct result! Time taken was 2322.02 ms.
+
+Doing test random-large5.ffttest...
+OK, correct result! Time taken was 4874.71 ms.
+
+Doing test random-large6.ffttest...
+OK, correct result! Time taken was 9481 ms.
+
+Doing test random-large7.ffttest...
+OK, correct result! Time taken was 19282.4 ms.
+
+Finished all tests.
+All tests passed!
+************************
+
+Initializing FFT...
+FFT Initialized!
+
+Starting large random cases with 2 cores.
+
+Starting tests using following implementation:
+Iterative In-Place FFT.
+************************
+Doing test random-large1.ffttest...
+OK, correct result! Time taken was 187.749 ms.
+
+Doing test random-large2.ffttest...
+OK, correct result! Time taken was 399.701 ms.
+
+Doing test random-large3.ffttest...
+OK, correct result! Time taken was 804.634 ms.
+
+Doing test random-large4.ffttest...
+OK, correct result! Time taken was 1645.23 ms.
+
+Doing test random-large5.ffttest...
+OK, correct result! Time taken was 3368.39 ms.
+
+Doing test random-large6.ffttest...
+OK, correct result! Time taken was 6797.88 ms.
+
+Doing test random-large7.ffttest...
+OK, correct result! Time taken was 14093.4 ms.
+
+Finished all tests.
+All tests passed!
+************************
+
+
+
+Initializing FFT...
+FFT Initialized!
+
+Starting large random cases with 4 cores.
+
+Starting tests using following implementation:
+Iterative In-Place FFT.
+************************
+Doing test random-large1.ffttest...
+OK, correct result! Time taken was 149.822 ms.
+
+Doing test random-large2.ffttest...
+OK, correct result! Time taken was 307.037 ms.
+
+Doing test random-large3.ffttest...
+OK, correct result! Time taken was 604.582 ms.
+
+Doing test random-large4.ffttest...
+OK, correct result! Time taken was 1376.4 ms.
+
+Doing test random-large5.ffttest...
+OK, correct result! Time taken was 2572.27 ms.
+
+Doing test random-large6.ffttest...
+OK, correct result! Time taken was 5199.7 ms.
+
+Doing test random-large7.ffttest...
+OK, correct result! Time taken was 10863.3 ms.
+
+Finished all tests.
+All tests passed!
+************************
+
+
+
+
+Initializing FFT...
+FFT Initialized!
+
+Starting large random cases with 8 cores.
+
+Starting tests using following implementation:
+Iterative In-Place FFT.
+************************
+Doing test random-large1.ffttest...
+OK, correct result! Time taken was 127.336 ms.
+
+Doing test random-large2.ffttest...
+OK, correct result! Time taken was 254.917 ms.
+
+Doing test random-large3.ffttest...
+OK, correct result! Time taken was 515.551 ms.
+
+Doing test random-large4.ffttest...
+OK, correct result! Time taken was 1062.6 ms.
+
+Doing test random-large5.ffttest...
+OK, correct result! Time taken was 2184.13 ms.
+
+Doing test random-large6.ffttest...
+OK, correct result! Time taken was 4590.45 ms.
+
+Doing test random-large7.ffttest...
+OK, correct result! Time taken was 9261.58 ms.
+
+Finished all tests.
+All tests passed!
+************************
+
+
+
+Initializing FFT...
+FFT Initialized!
+
+Starting large random cases with 16 cores.
+
+Starting tests using following implementation:
+Iterative In-Place FFT.
+************************
+Doing test random-large1.ffttest...
+OK, correct result! Time taken was 118.097 ms.
+
+Doing test random-large2.ffttest...
+OK, correct result! Time taken was 233.526 ms.
+
+Doing test random-large3.ffttest...
+OK, correct result! Time taken was 467.631 ms.
+
+Doing test random-large4.ffttest...
+OK, correct result! Time taken was 960.63 ms.
+
+Doing test random-large5.ffttest...
+OK, correct result! Time taken was 1992.86 ms.
+
+Doing test random-large6.ffttest...
+OK, correct result! Time taken was 4276.53 ms.
+
+Doing test random-large7.ffttest...
+OK, correct result! Time taken was 8529.45 ms.
+
+Finished all tests.
+All tests passed!
+************************
+
+
